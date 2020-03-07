@@ -81,4 +81,7 @@ The servers can be access by anybody connected with a shell on the host.
 * Add kerberos/ldap support
 * Install required distro packages
 * Put each feature in a separate script
+* Add user/group params and --create-only to allow running the script by root
+  or an admin process.
+
 
