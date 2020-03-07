@@ -12,11 +12,14 @@ systemd_filename="${HOME}/.config/systemd/user/httpd.service"
 usage () {
 	cat <<EOF_USAGE
 
-Usage: ${PRG} [--help|-h] [--systemd-enable] [--systemd-uninstall] <prefix_env>
+Usage: ${PRG} [--help|-h] [--systemd-enable] [--systemd-uninstall] [--listen-port] <prefix_env>
 
 	--help|-h                  : This help
 	--systemd-enable           : configure user systemd service and runs it
 	--systemd-uninstall        : remove user systemd configuration
+	--listen-port              : Define http listen port.
+	                             Must be greter then 1024.
+	                             Default is 8080.
 
 	prefix_env                 : dir where cgit and http data will be created
 
@@ -255,6 +258,7 @@ systemd_enable () {
 	systemd_user_dir="${1}"
 	systemd_filename="${2}"
 	httpd_bin="${3}"
+	listen_port="${4}"
 
 	[ ! -d "${systemd_user_dir}" ] && mkdir "${systemd_user_dir}"
 	cat > "${systemd_filename}" <<EOF_SYSTEMD 
@@ -265,7 +269,7 @@ Description=My web server
 Type=simple
 ExecStart=${httpd_bin} -d "${serverroot}" -DFOREGROUND \
            -c"PidFile var/httpd.pid" \
-           -c"Listen 127.0.0.1:8080"
+           -c"Listen 127.0.0.1:${listen_port}"
 ExecStop=${httpd_bin} -k graceful-stop 
 ExecReload=${httpd_bin} -k graceful
 PrivateTmp=true
@@ -398,6 +402,7 @@ EOF_CGIT
 
 SYSTEMD_ENABLE="no"
 prefix_env=""
+listen_port="8080"
 
 while [ -n "${1}" ]
 do
@@ -414,6 +419,10 @@ do
 		"--systemd-uninstall" )
 			systemd_uninstall "${systemd_user_dir}" "${systemd_filename}"
 			exit $?
+			;;
+		"--listen-port")
+			listen_port="${2}"
+			shift
 			;;
 		*)
 			prefix_env="${1}"
@@ -439,6 +448,13 @@ then
 		printf -- "[-] ERROR, httpd binary not found in list\n%s\n" "${httpd_bin_list}"
 		exit 2
 fi
+
+if [ -z "${listen_port}" ]
+then
+		printf -- "[-] ERROR, httpd listen_port must be set \n"
+		exit 2
+fi
+
 
 
 # Mandatory parameter.
@@ -503,11 +519,11 @@ grep -q -v "^Include ${conf_extra_dir}/httpd-cgit.conf" "${httpd_conf}" \
 
 if [ "${SYSTEMD_ENABLE}" = "yes" ]
 then
-		systemd_enable "${systemd_user_dir}" "${systemd_filename}" "${httpd_bin}"
+		systemd_enable "${systemd_user_dir}" "${systemd_filename}" "${httpd_bin}" "${listen_port}"
 else
  		"${httpd_bin}" -d "${serverroot}" -DFOREGROUND \
 			-c"PidFile var/httpd.pid" \
-			-c"Listen 127.0.0.1:8080"
+			-c"Listen 127.0.0.1:${listen_port}"
 fi
 
 

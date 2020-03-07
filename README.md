@@ -26,12 +26,14 @@ The **mygitserver** script creates a httpd user environment using
 It's developed on [Arch](https://www.archlinux.org/) and tested on [CentOS
 7](https://www.centos.org)
 
-    Usage: my_httpd_server [--help|-h] [--systemd-enable] [--systemd-uninstall] <prefix_env>
+    Usage: mygitserver [--help|-h] [--systemd-enable] [--systemd-uninstall] [--listen-port] <prefix_env>
     
     	--help|-h                  : This help
     	--systemd-enable           : configure user systemd service and runs it
     	--systemd-uninstall        : remove user systemd configuration
-    
+    	--listen-port              : Define http listen port.
+    	                             Must be greter then 1024.
+    	                             Default is 8080.
     	prefix_env                 : dir where cgit and http data will be created
 
 Will create :
@@ -65,9 +67,7 @@ can organize bare repos in subdirs.
 It's also possible to link existing git repos.
 
 
-
 ## TODO
-* Define port when multi user on the same host.
 * Allow user defined logo.
 * Add httpd server param to manage configuration (apache/nginx/ligthttp...)
 * Certainly many others good features.
@@ -76,4 +76,6 @@ It's also possible to link existing git repos.
 * Add kerberos/ldap support
 * Install required distro packages
 * Put each feature in a separate script
+
+
 
