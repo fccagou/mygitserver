@@ -12,7 +12,7 @@ systemd_filename="${HOME}/.config/systemd/user/httpd.service"
 usage () {
 	cat <<EOF_USAGE
 
-Usage: ${PRG} [--help|-h] [--systemd-enable] [--systemd-uninstall] [--listen-port] <prefix_env>
+Usage: ${PRG} [--help|-h] [--systemd-enable] [--systemd-uninstall] [--listen-port] [--add-myself-as-git-sample] <prefix_env>
 
 	--help|-h                  : This help
 	--systemd-enable           : configure user systemd service and runs it
@@ -20,7 +20,7 @@ Usage: ${PRG} [--help|-h] [--systemd-enable] [--systemd-uninstall] [--listen-por
 	--listen-port              : Define http listen port.
 	                             Must be greter then 1024.
 	                             Default is 8080.
-
+	--add-myself-as-git-sample : Clone myself in repos.
 	prefix_env                 : dir where cgit and http data will be created
 
 EOF_USAGE
@@ -403,6 +403,8 @@ EOF_CGIT
 SYSTEMD_ENABLE="no"
 prefix_env=""
 listen_port="8080"
+add_samples=""
+
 
 while [ -n "${1}" ]
 do
@@ -423,6 +425,9 @@ do
 		"--listen-port")
 			listen_port="${2}"
 			shift
+			;;
+		"--add-myself-as-git-sample")
+			add_samples="yes"
 			;;
 		*)
 			prefix_env="${1}"
@@ -515,7 +520,20 @@ cgit_http_conf "${conf_extra_dir}"/httpd-cgit.conf \
 grep -q -v "^Include ${conf_extra_dir}/httpd-cgit.conf" "${httpd_conf}" \
 	&& echo "Include ${conf_extra_dir}/httpd-cgit.conf" >> "${httpd_conf}"
 
-
+if [ "${add_samples}" = "yes" ]
+then
+	remote_git_dir="${cgit_root}"/repos/"${PRG}".git
+	if [ ! -d "${remote_git_dir}" ]
+	then
+		git clone --bare .git "${remote_git_dir}"
+		echo "${PRG} : simple git server" > "${remote_git_dir}"/description
+		git --git-dir="${remote_git_dir}" config core.sharedRepository group
+		git --git-dir="${remote_git_dir}" config remote.origin.url \
+			$(git config remote.origin.url | sed 's#git@github.com:#https://github.com/#')
+	else
+		( cd "${remote_git_dir}" && git pull origin master:master )
+	fi
+fi
 
 if [ "${SYSTEMD_ENABLE}" = "yes" ]
 then
