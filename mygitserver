@@ -1,0 +1,518 @@
+#!/bin/sh
+
+PRG="$(basename "${0}")"
+
+systemd_user_dir="${HOME}/.config/systemd/user/"
+systemd_filename="${HOME}/.config/systemd/user/httpd.service"
+
+# =============================================================================
+# FUNCTIONS
+# =============================================================================
+
+usage () {
+	cat <<EOF_USAGE
+
+Usage: ${PRG} [--help|-h] [--systemd-enable] [--systemd-uninstall] <prefix_env>
+
+	--help|-h                  : This help
+	--systemd-enable           : configure user systemd service and runs it
+	--systemd-uninstall        : remove user systemd configuration
+
+	prefix_env                 : dir where cgit and http data will be created
+
+EOF_USAGE
+
+}
+
+# -----------------------------------------------------------------------------
+#  Create apache httpd module link
+# -----------------------------------------------------------------------------
+config_modules_dir () {
+
+	modules_dir="${1}"
+
+	if [ ! -e "${modules_dir}" ]
+	then
+	    if [ -e /etc/httpd/modules ]
+		then
+		    ln -sf /etc/httpd/modules "${modules_dir}"
+		elif [ -e /usr/lib/apache2/modules ]
+		then
+		    ln -sf /usr/lib/apache2/modules "${modules_dir}"
+		else
+			printf -- "[-] ERROR no apache module found\n"
+			exit 1
+		fi
+	fi
+}
+
+# -----------------------------------------------------------------------------
+# Create links to global conf files 
+# -----------------------------------------------------------------------------
+config_mime_magic () {
+
+	conf_dir="${1}"
+	for f in mime.types magic
+	do
+		if [ ! -e "${conf_dir}/${f}" ]
+		then
+			if [ -e /etc/httpd/conf/"${f}" ]
+			then
+				ln -sf /etc/httpd/conf/"${f}" "${conf_dir}/${f}"
+			elif [ -e /etc/apache2/conf/"${f}" ]
+			then
+				ln -sf /etc/apache2/conf/"${f}" "${conf_dir}/${f}"
+			elif [ -e /etc/"${f}" ]
+			then
+				ln -sf /etc/"${f}" "${conf_dir}/${f}"
+			else
+				printf -- "[-] ERROR no apache %s found\n" "${f}"
+				exit 1
+			fi
+		fi
+	done
+}
+
+
+# -----------------------------------------------------------------------------
+# Create local httpd serverroot
+# -----------------------------------------------------------------------------
+config_httpd () {
+	conf_dir="${1}"
+	httpd_conf="${2}"
+	serverroot="${3}"
+    documentroot="${4}"
+	conf_extra_dir="${5}"
+
+	[ ! -d "${conf_dir}" ] && mkdir -p "${conf_dir}"
+
+	cat > "${httpd_conf}" <<EOF_HTTPD_CONF
+# DO NOT EDIT - AUTOCONF FILE
+LoadModule authn_file_module modules/mod_authn_file.so
+LoadModule authn_core_module modules/mod_authn_core.so
+LoadModule authz_host_module modules/mod_authz_host.so
+LoadModule authz_groupfile_module modules/mod_authz_groupfile.so
+LoadModule authz_user_module modules/mod_authz_user.so
+LoadModule authz_core_module modules/mod_authz_core.so
+LoadModule access_compat_module modules/mod_access_compat.so
+LoadModule auth_basic_module modules/mod_auth_basic.so
+LoadModule filter_module modules/mod_filter.so
+#LoadModule version_module modules/mod_version.so
+#LoadModule slotmem_shm_module modules/mod_slotmem_shm.so
+#LoadModule status_module modules/mod_status.so
+#LoadModule autoindex_module modules/mod_autoindex.so
+
+LoadModule include_module modules/mod_include.so
+LoadModule dir_module modules/mod_dir.so
+LoadModule log_config_module modules/mod_log_config.so
+LoadModule alias_module modules/mod_alias.so
+# LoadModule headers_module modules/mod_headers.so
+LoadModule mime_module modules/mod_mime.so
+LoadModule mpm_event_module modules/mod_mpm_event.so
+LoadModule reqtimeout_module modules/mod_reqtimeout.so
+# 4 CGIT
+LoadModule setenvif_module modules/mod_setenvif.so
+LoadModule env_module modules/mod_env.so
+LoadModule cgi_module modules/mod_cgi.so
+LoadModule unixd_module modules/mod_unixd.so
+
+ServerRoot ${serverroot}
+
+# Est-ce nécessaire quand lancé par le user ?
+# <IfModule unixd_module>
+# User http
+# Group http
+# </IfModule>
+
+# ------- User email
+ServerAdmin ${USER}@localhost
+
+# ------ Default access policy : disable all
+<Directory />
+    AllowOverride none
+    Require all denied
+</Directory>
+
+# ------ Document Root
+DocumentRoot ${documentroot}
+<Directory "${documentroot}">
+    Options Indexes FollowSymLinks
+    AllowOverride None
+    Require all granted
+</Directory>
+
+
+DirectoryIndex index.html
+<Files ".ht*">
+    Require all denied
+</Files>
+
+
+# ------ log configuration
+ErrorLog "var/log/error_log"
+LogLevel warn
+
+<IfModule log_config_module>
+    LogFormat "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" combined
+    LogFormat "%h %l %u %t \"%r\" %>s %b" common
+
+    <IfModule logio_module>
+      LogFormat "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\" %I %O" combinedio
+    </IfModule>
+
+    CustomLog "var/log/access_log" common
+
+</IfModule>
+
+
+<IfModule alias_module>
+    ScriptAlias /cgi-bin/ "${serverroot}/cgi-bin/"
+    <Directory "${serverroot}/cgi-bin">
+        AllowOverride None
+        Options None
+        Require all granted
+    </Directory>
+</IfModule>
+
+
+# <IfModule headers_module>
+#     RequestHeader unset Proxy early
+# </IfModule>
+
+
+<IfModule mime_module>
+    TypesConfig conf/mime.types
+    AddType application/x-compress .Z
+    AddType application/x-gzip .gz .tgz
+</IfModule>
+
+# ------ Multithread
+#
+<IfModule mpm_event_module>
+    StartServers             3
+    MinSpareThreads         75
+    MaxSpareThreads        250
+    ThreadsPerChild         25
+    MaxRequestWorkers      400
+    MaxConnectionsPerChild   0
+</IfModule>
+
+# ------ Default conf
+#
+Timeout 60
+KeepAlive On
+MaxKeepAliveRequests 100
+KeepAliveTimeout 5
+UseCanonicalName Off
+AccessFileName .htaccess
+ServerTokens Full
+ServerSignature Off
+HostnameLookups Off
+<IfModule reqtimeout_module>
+  RequestReadTimeout header=20-40,MinRate=500 body=20,MinRate=500
+</IfModule>
+
+EOF_HTTPD_CONF
+
+	[ ! -d "${conf_extra_dir}" ] && mkdir -p "${conf_extra_dir}"
+
+}
+
+
+
+# -----------------------------------------------------------------------------
+# Create default index page.
+# -----------------------------------------------------------------------------
+make_index () {
+	index_html="${1}"
+	[ ! -f "${index_html}" ] && cat > "${index_html}" <<EOF_HTML
+<!DOCTYPE html>
+<html lang='${LANG}'>
+<head>
+<title>${USER} web page</title>
+<meta name='robots' content='index, nofollow'/>
+</head>
+<body>
+<h2>${USER} page</h2>
+<div id="default_app">
+  <ul>
+  <li><a href="/cgit" alt"Git repos">Git repos</a></li>
+  </ul>
+</div>
+</body>
+</html>
+
+EOF_HTML
+}
+
+
+
+# ----------------------------------------------------------------------------
+# SYSTEMD install and enable user service
+# ----------------------------------------------------------------------------
+systemd_enable () {
+	
+	systemd_user_dir="${1}"
+	systemd_filename="${2}"
+	httpd_bin="${3}"
+
+	[ ! -d "${systemd_user_dir}" ] && mkdir "${systemd_user_dir}"
+	cat > "${systemd_filename}" <<EOF_SYSTEMD 
+[Unit]
+Description=My web server
+
+[Service]
+Type=simple
+ExecStart=${httpd_bin} -d "${serverroot}" -DFOREGROUND \
+           -c"PidFile var/httpd.pid" \
+           -c"Listen 127.0.0.1:8080"
+ExecStop=${httpd_bin} -k graceful-stop 
+ExecReload=${httpd_bin} -k graceful
+PrivateTmp=true
+LimitNOFILE=infinity
+KillMode=mixed
+
+[Install]
+WantedBy=default.target
+           
+EOF_SYSTEMD
+	
+		systemctl --user daemon-reload
+		systemctl --user enable httpd
+		systemctl --user restart httpd
+}
+
+
+# ----------------------------------------------------------------------------
+# SYSTEMD remove user service
+# ----------------------------------------------------------------------------
+systemd_uninstall () {
+	
+	systemd_user_dir="${1}"
+	systemd_filename="${2}"
+
+	if [ -f "${systemd_filename}" ]
+	then
+		systemctl --user stop httpd
+		systemctl --user disable httpd
+		/bin/rm -f "${systemd_filename}"
+		systemctl --user daemon-reload
+	fi
+}
+
+
+
+
+
+# ----------------------------------------------------------------------------
+# CGIT create cgitrc file
+# ----------------------------------------------------------------------------
+cgit_conf () {
+	cgit_root="${1}"
+	cgit_rc="${2}"
+
+	[ ! -d "${cgit_root}" ] && mkdir -p "${cgit_root}" 
+	[ ! -d "${cgit_root}"/repos ] && mkdir -p "${cgit_root}"/repos
+
+	cat > "${cgit_rc}" <<EOF_CGITRC
+#
+# See cgitrc(5) or /usr/share/doc/cgit-*/cgitrc.5.html for details
+#
+cache-size=0
+css=/cgit-css/cgit.css
+enable-index-links=1
+enable-commit-graph=1
+enable-log-filecount=1
+enable-log-linecount=1
+logo=/cgit-css/cgit.png
+max-stats=year
+root-title=${USER} git repos
+root-desc=Some sources
+# Include some more info about this site on the index page
+#root-readme=/var/www/html/about.html
+# Allow download of tar.gz, tar.bz2 and zip-files
+snapshots=tar.gz tar.bz2 zip
+##
+## List of common mimetypes
+##
+mimetype.gif=image/gif
+mimetype.html=text/html
+mimetype.jpg=image/jpeg
+mimetype.jpeg=image/jpeg
+mimetype.pdf=application/pdf
+mimetype.png=image/png
+mimetype.svg=image/svg+xml
+# Enable syntax highlighting (requires the highlight package)
+#source-filter=/usr/libexec/cgit/filters/syntax-highlighting.sh
+enable-commit-graph=1
+enable-blame=1
+enable-git-config=1
+section-from-path=1
+scan-path=\$CGIT_ROOT/repos
+EOF_CGITRC
+
+}
+
+
+
+# ----------------------------------------------------------------------------
+# CGIT create httpd conf file
+# ----------------------------------------------------------------------------
+cgit_http_conf () {
+	http_conf_filename="${1}"
+	cgit_root="${2}"
+	cgit_rc="${3}"
+	cgit_home="${4}"
+	cgit_script="${5}"
+	cgit_data="${6}"
+
+	cat > "${http_conf_filename}" <<EOF_CGIT
+SetEnv CGIT_ROOT ${cgit_root}
+SetEnv CGIT_CONFIG ${cgit_rc}
+
+ScriptAlias /cgit "${cgit_script}"
+Alias /cgit-css "${cgit_data}"
+<Directory "${cgit_data}">
+   AllowOverride None
+   Options None
+   Require all granted
+</Directory>
+<Directory "${cgit_home}">
+   AllowOverride None
+   Options ExecCGI FollowSymlinks
+   Require all granted
+</Directory>
+
+EOF_CGIT
+}
+
+
+
+
+# ============================================================================
+# MAIN
+# ============================================================================
+
+# Process parameters
+# TODO: use getops. Not necessary yet.
+
+SYSTEMD_ENABLE="no"
+prefix_env=""
+
+while [ -n "${1}" ]
+do
+	case "${1}" in
+		"--help"|"-h")
+			usage
+			exit 0
+			;;
+
+		"--systemd-enable" )
+			SYSTEMD_ENABLE="yes"
+			;;
+	
+		"--systemd-uninstall" )
+			systemd_uninstall "${systemd_user_dir}" "${systemd_filename}"
+			exit $?
+			;;
+		*)
+			prefix_env="${1}"
+			;;
+	esac
+	shift
+done
+
+httpd_bin_list="/usr/bin/httpd /usr/sbin/httpd"
+httpd_bin=""
+
+for b in ${httpd_bin_list}
+do
+	if [ -x "${b}" ]
+	then
+		httpd_bin="${b}"
+		break
+	fi
+done
+
+if [ -z "${httpd_bin}" ]
+then
+		printf -- "[-] ERROR, httpd binary not found in list\n%s\n" "${httpd_bin_list}"
+		exit 2
+fi
+
+
+# Mandatory parameter.
+if [ -z "${prefix_env}" ]
+then
+	printf -- "[-] ERROR, prefix_env not defined \n"
+	usage
+	exit 1
+fi
+
+# Hum, the directory exists, let the user remove it if necessary
+# TODO: add --env-update or something like that.
+if [ -d "${prefix_env}" ]
+then
+	printf -- "[-] ERROR, prefix_env %s exists\n" "${prefix_env}"
+	exit 2
+fi
+
+# OK, got my env dir created, lets go  ....
+serverroot="${prefix_env}"/web
+documentroot="${serverroot}"/www
+index_html="${documentroot}"/index.html
+conf_dir="${serverroot}"/conf
+httpd_conf="${serverroot}"/conf/httpd.conf
+conf_extra_dir="${conf_dir}"/extra
+modules_dir="${serverroot}"/modules
+
+cgit_root="${prefix_env}"/cgit
+cgit_rc="${cgit_root}"/cgitrc
+
+
+
+# Creating httpd env skeleton
+for d in "${conf_extra_dir}" "${serverroot}"/var/log "${documentroot}"
+do
+	if ! mkdir -p "${d}"
+	then
+		printf -- "[-] ERROR, error creating %s in serverroot \n" "${d}"
+		exit 2
+	fi
+done
+
+
+config_modules_dir "${modules_dir}"
+config_mime_magic "${conf_dir}"
+config_httpd "${conf_dir}" "${httpd_conf}" "${serverroot}" "${documentroot}" "${conf_extra_dir}"
+make_index "${index_html}"
+
+
+cgit_conf "${cgit_root}" "${cgit_rc}"
+cgit_http_conf "${conf_extra_dir}"/httpd-cgit.conf \
+    "${cgit_root}" \
+	"${cgit_rc}" \
+    "/usr/lib/cgit/" \
+	"/usr/lib/cgit/cgit.cgi/" \
+    "/usr/share/webapps/cgit/"
+
+grep -q -v "^Include ${conf_extra_dir}/httpd-cgit.conf" "${httpd_conf}" \
+	&& echo "Include ${conf_extra_dir}/httpd-cgit.conf" >> "${httpd_conf}"
+
+
+
+if [ "${SYSTEMD_ENABLE}" = "yes" ]
+then
+		systemd_enable "${systemd_user_dir}" "${systemd_filename}" "${httpd_bin}"
+else
+ 		"${httpd_bin}" -d "${serverroot}" -DFOREGROUND \
+			-c"PidFile var/httpd.pid" \
+			-c"Listen 127.0.0.1:8080"
+fi
+
+
+
+
+
+
+
