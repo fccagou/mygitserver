@@ -68,6 +68,9 @@ can organize bare repos in subdirs.
 
 It's also possible to link existing git repos.
 
+## Warning
+
+The servers can be access by anybody connected with a shell on the host.
 
 ## TODO
 * Allow user defined logo.
