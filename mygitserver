@@ -535,6 +535,11 @@ then
 	fi
 fi
 
+chmod 2770 "${prefix_env}"
+
+find "${prefix_env}" -type d -exec chmod 2770 {} \;
+find "${prefix_env}" -type f -exec chmod ug+rw,o-rwx {} \;
+
 if [ "${SYSTEMD_ENABLE}" = "yes" ]
 then
 		systemd_enable "${systemd_user_dir}" "${systemd_filename}" "${httpd_bin}" "${listen_port}"
