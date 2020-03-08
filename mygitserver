@@ -69,7 +69,7 @@ config_modules_dir () {
 }
 
 # -----------------------------------------------------------------------------
-# Create links to global conf files 
+# Create links to global conf files
 # -----------------------------------------------------------------------------
 config_mime_magic () {
 
@@ -284,7 +284,7 @@ systemd_enable () {
 	listen_port="${4}"
 
 	[ ! -d "${systemd_user_dir}" ] && mkdir "${systemd_user_dir}"
-	cat > "${systemd_filename}" <<EOF_SYSTEMD 
+	cat > "${systemd_filename}" <<EOF_SYSTEMD
 [Unit]
 Description=My web server
 
@@ -293,7 +293,7 @@ Type=simple
 ExecStart=${httpd_bin} -d "${serverroot}" -DFOREGROUND \
            -c"PidFile var/httpd.pid" \
            -c"Listen 127.0.0.1:${listen_port}"
-ExecStop=${httpd_bin} -k graceful-stop 
+ExecStop=${httpd_bin} -k graceful-stop
 ExecReload=${httpd_bin} -k graceful
 PrivateTmp=true
 LimitNOFILE=infinity
@@ -301,7 +301,7 @@ KillMode=mixed
 
 [Install]
 WantedBy=default.target
-           
+
 EOF_SYSTEMD
 	
 		systemctl --user daemon-reload
@@ -339,7 +339,7 @@ cgit_conf () {
 	cgit_rc="${2}"
 	user_param="${3}"
 
-	[ ! -d "${cgit_root}" ] && mkdir -p "${cgit_root}" 
+	[ ! -d "${cgit_root}" ] && mkdir -p "${cgit_root}"
 	[ ! -d "${cgit_root}"/repos ] && mkdir -p "${cgit_root}"/repos
 
 	cat > "${cgit_rc}" <<EOF_CGITRC
@@ -506,8 +506,8 @@ fi
 
 if [ -z "${listen_port}" ]
 then
-		printf -- "[-] ERROR, httpd listen_port must be set \n"
-		exit 2
+	printf -- "[-] ERROR, httpd listen_port must be set \n"
+	exit 2
 fi
 
 if ! getent passwd "${user_param}" >/dev/null 2>&1
@@ -592,7 +592,7 @@ then
 		echo "${PRG} : simple git server" > "${remote_git_dir}"/description
 		git --git-dir="${remote_git_dir}" config core.sharedRepository group
 		git --git-dir="${remote_git_dir}" config remote.origin.url \
-			$(git config remote.origin.url | sed 's#git@github.com:#https://github.com/#')
+			"$(git config remote.origin.url | sed 's#git@github.com:#https://github.com/#')"
 	else
 		( cd "${remote_git_dir}" && git pull origin master:master )
 	fi
@@ -618,11 +618,11 @@ then
 
 	if [ "${SYSTEMD_ENABLE}" = "yes" ]
 	then
-			systemd_enable "${systemd_user_dir}" "${systemd_filename}" "${httpd_bin}" "${listen_port}"
+		systemd_enable "${systemd_user_dir}" "${systemd_filename}" "${httpd_bin}" "${listen_port}"
 	else
-			"${httpd_bin}" -d "${serverroot}" -DFOREGROUND \
-				-c"PidFile var/httpd.pid" \
-				-c"Listen 127.0.0.1:${listen_port}"
+		"${httpd_bin}" -d "${serverroot}" -DFOREGROUND \
+			-c"PidFile var/httpd.pid" \
+			-c"Listen 127.0.0.1:${listen_port}"
 	fi
 fi
 
