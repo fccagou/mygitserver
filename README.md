@@ -86,6 +86,47 @@ It's also possible to link existing git repos.
 ## Warning
 
 The servers can be access by anybody connected with a shell on the host.
+## Selinux
+
+On CentOS, the default policy does not allow running cgit. I'ts necessary to
+create and install a dedicated module.
+
+First install needed package :
+
+    yum install policycoreutils-devel
+
+
+then create _cgit.te_ for default httpd server.
+
+    cat > cgit.te <<EOF_TE
+    module cgit 1.0;
+    
+    require {
+            type httpd_sys_rw_content_t;
+            type git_script_t;
+            class dir { getattr open read search };
+            class file { getattr open read };
+    }
+    
+    #============= git_script_t ==============
+    allow git_script_t httpd_sys_rw_content_t:dir { getattr open read search };
+    allow git_script_t httpd_sys_rw_content_t:file { getattr open read };
+    EOF_TE
+
+Build the policy
+
+    make -f /usr/share/selinux/devel/Makefile cgit.pp
+
+Install the policy module
+
+    semodule -i cgit.pp
+
+
+If the git dir is not a default httpd dir, update fcontext
+
+    semanage fcontext -a -t httpd_sys_rw_content_t -r s0  '/srv/git-repos(/.*)?'
+
+
 
 ## TODO
 * Allow user defined logo.
@@ -100,4 +141,4 @@ The servers can be access by anybody connected with a shell on the host.
 * Add --env-update or something like that.
 * Add current usercheck to use or not sudo.
 * Configure systemd for all users
-
+* make a [puppet/bolt](https://puppet.com/docs/bolt/latest/bolt.html) project.
