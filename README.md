@@ -26,17 +26,32 @@ The **mygitserver** script creates a httpd user environment using
 It's developed on [Arch](https://www.archlinux.org/) and tested on [CentOS
 7](https://www.centos.org)
 
-    Usage: mygitserver [--help|-h] [--systemd-enable] [--systemd-uninstall] [--listen-port] [--add-myself-as-git-sample] <prefix_env>
+    Usage: mygitserver [--help|-h]
+                  [--run]
+                  [--user <user>]
+                  [--group <group>]
+                  [--systemd-enable]
+                  [--systemd-uninstall]
+                  [--listen-port <port>]
+                  [--add-myself-as-git-sample]
+                  <prefix_env>
     
-    	--help|-h                  : This help
-    	--systemd-enable           : configure user systemd service and runs it
-    	--systemd-uninstall        : remove user systemd configuration
-    	--listen-port              : Define http listen port.
-    	                             Must be greter then 1024.
-    	                             Default is 8080.
-    	--add-myself-as-git-sample : Clone myself in repos.
-    	prefix_env                 : dir where cgit and http data will be created
-
+       --help|-h                  : This help
+       --run                      : Run the server after creation.
+                                    Only works for current user.
+       --user                     : Install service for his user.
+                                    Default is current user (fccagou)
+       --group                    : Install service for this group.
+                                    Default is current user group(fccagou).
+       --systemd-enable           : configure user systemd service and runs it.
+                                    Only works for current user.
+       --systemd-uninstall        : remove user systemd configuration
+                                    Only works for current user.
+       --listen-port              : Define http listen port.
+                                    Must be greter then 1024.
+                                    Default is 8080.
+       --add-myself-as-git-sample : Clone myself in repos.
+       prefix_env                 : dir where cgit and http data will be created
 
 Will create :
     
@@ -81,7 +96,8 @@ The servers can be access by anybody connected with a shell on the host.
 * Add kerberos/ldap support
 * Install required distro packages
 * Put each feature in a separate script
-* Add user/group params and --create-only to allow running the script by root
-  or an admin process.
-
+* Use getops. Not necessary yet.
+* Add --env-update or something like that.
+* Add current usercheck to use or not sudo.
+* Configure systemd for all users
 

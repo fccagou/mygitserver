@@ -5,6 +5,9 @@ PRG="$(basename "${0}")"
 systemd_user_dir="${HOME}/.config/systemd/user/"
 systemd_filename="${HOME}/.config/systemd/user/httpd.service"
 
+user_param="$(id -u -n)"
+group_param="$(id -g -n)"
+
 # =============================================================================
 # FUNCTIONS
 # =============================================================================
@@ -12,11 +15,27 @@ systemd_filename="${HOME}/.config/systemd/user/httpd.service"
 usage () {
 	cat <<EOF_USAGE
 
-Usage: ${PRG} [--help|-h] [--systemd-enable] [--systemd-uninstall] [--listen-port] [--add-myself-as-git-sample] <prefix_env>
+Usage: ${PRG} [--help|-h]
+              [--run]
+              [--user <user>]
+              [--group <group>]
+              [--systemd-enable]
+              [--systemd-uninstall]
+              [--listen-port <port>]
+              [--add-myself-as-git-sample]
+              <prefix_env>
 
 	--help|-h                  : This help
-	--systemd-enable           : configure user systemd service and runs it
+	--run                      : Run the server after creation.
+                                 Only works for current user.
+	--user                     : Install service for his user.
+                                 Default is current user (${user_param})
+	--group                    : Install service for this group.
+	                             Default is current user group(${group_param}).
+	--systemd-enable           : configure user systemd service and runs it.
+                                 Only works for current user.
 	--systemd-uninstall        : remove user systemd configuration
+                                 Only works for current user.
 	--listen-port              : Define http listen port.
 	                             Must be greter then 1024.
 	                             Default is 8080.
@@ -86,6 +105,8 @@ config_httpd () {
 	serverroot="${3}"
     documentroot="${4}"
 	conf_extra_dir="${5}"
+	user_param="${6}"
+	group_param="${7}"
 
 	[ ! -d "${conf_dir}" ] && mkdir -p "${conf_dir}"
 
@@ -122,13 +143,13 @@ LoadModule unixd_module modules/mod_unixd.so
 ServerRoot ${serverroot}
 
 # Est-ce nécessaire quand lancé par le user ?
-# <IfModule unixd_module>
-# User http
-# Group http
-# </IfModule>
+<IfModule unixd_module>
+  User ${user_param}
+  Group ${group_param}
+</IfModule>
 
 # ------- User email
-ServerAdmin ${USER}@localhost
+ServerAdmin ${user_param}@localhost
 
 # ------ Default access policy : disable all
 <Directory />
@@ -228,15 +249,17 @@ EOF_HTTPD_CONF
 # -----------------------------------------------------------------------------
 make_index () {
 	index_html="${1}"
+	user_param="${2}"
+
 	[ ! -f "${index_html}" ] && cat > "${index_html}" <<EOF_HTML
 <!DOCTYPE html>
 <html lang='${LANG}'>
 <head>
-<title>${USER} web page</title>
+<title>${user_param} web page</title>
 <meta name='robots' content='index, nofollow'/>
 </head>
 <body>
-<h2>${USER} page</h2>
+<h2>${user_param} default's page</h2>
 <div id="default_app">
   <ul>
   <li><a href="/cgit" alt"Git repos">Git repos</a></li>
@@ -314,6 +337,7 @@ systemd_uninstall () {
 cgit_conf () {
 	cgit_root="${1}"
 	cgit_rc="${2}"
+	user_param="${3}"
 
 	[ ! -d "${cgit_root}" ] && mkdir -p "${cgit_root}" 
 	[ ! -d "${cgit_root}"/repos ] && mkdir -p "${cgit_root}"/repos
@@ -330,7 +354,7 @@ enable-log-filecount=1
 enable-log-linecount=1
 logo=/cgit-css/cgit.png
 max-stats=year
-root-title=${USER} git repos
+root-title=${user_param} git repos
 root-desc=Some sources
 # Include some more info about this site on the index page
 #root-readme=/var/www/html/about.html
@@ -352,6 +376,7 @@ enable-commit-graph=1
 enable-blame=1
 enable-git-config=1
 section-from-path=1
+#CGIT_ROOT is defined in httpd conf.
 scan-path=\$CGIT_ROOT/repos
 EOF_CGITRC
 
@@ -401,9 +426,11 @@ EOF_CGIT
 # TODO: use getops. Not necessary yet.
 
 SYSTEMD_ENABLE="no"
+SYSTEMD_UNINSTALL="no"
 prefix_env=""
 listen_port="8080"
 add_samples=""
+run_service="no"
 
 
 while [ -n "${1}" ]
@@ -413,14 +440,15 @@ do
 			usage
 			exit 0
 			;;
-
+		"--run" )
+			run_service="yes"
+			;;
 		"--systemd-enable" )
 			SYSTEMD_ENABLE="yes"
 			;;
 	
 		"--systemd-uninstall" )
-			systemd_uninstall "${systemd_user_dir}" "${systemd_filename}"
-			exit $?
+			SYSTEMD_UNINSTALL="yes"
 			;;
 		"--listen-port")
 			listen_port="${2}"
@@ -429,12 +457,34 @@ do
 		"--add-myself-as-git-sample")
 			add_samples="yes"
 			;;
+		"--user")
+			user_param="${2}"
+			shift
+			;;
+		"--group")
+			group_param="${2}"
+			shift
+			;;
+
 		*)
 			prefix_env="${1}"
 			;;
 	esac
 	shift
 done
+
+if [ "${SYSTEMD_UNINSTALL}" = "yes" ]
+then
+	if [ "$(id -u -n)" = "${user_param}" ]
+	then
+		systemd_uninstall "${systemd_user_dir}" "${systemd_filename}"
+		exit $?
+	fi
+	printf -- "[-] ERROR, --systemd-uninstall only works for current user\n"
+	exit 3
+fi
+
+
 
 httpd_bin_list="/usr/bin/httpd /usr/sbin/httpd"
 httpd_bin=""
@@ -460,6 +510,17 @@ then
 		exit 2
 fi
 
+if ! getent passwd "${user_param}" >/dev/null 2>&1
+then
+	printf -- "[-] ERROR, unknown user %s\n" "${user_param}"
+	exit 2
+fi
+
+if ! getent group "${group_param}" > /dev/null 2>&1
+then
+	printf -- "[-] ERROR, unknown group %s\n" "${group_param}"
+	exit 2
+fi
 
 
 # Mandatory parameter.
@@ -505,11 +566,13 @@ done
 
 config_modules_dir "${modules_dir}"
 config_mime_magic "${conf_dir}"
-config_httpd "${conf_dir}" "${httpd_conf}" "${serverroot}" "${documentroot}" "${conf_extra_dir}"
-make_index "${index_html}"
+config_httpd "${conf_dir}" "${httpd_conf}" \
+	         "${serverroot}" "${documentroot}" "${conf_extra_dir}" \
+			 "${user_param}" "${group_param}"
+make_index "${index_html}" "${user_param}"
 
 
-cgit_conf "${cgit_root}" "${cgit_rc}"
+cgit_conf "${cgit_root}" "${cgit_rc}" "${user_param}"
 cgit_http_conf "${conf_extra_dir}"/httpd-cgit.conf \
     "${cgit_root}" \
 	"${cgit_rc}" \
@@ -535,23 +598,31 @@ then
 	fi
 fi
 
+#TODO: add current usercheck to use or not sudo.
+chown -R "${user_param}:${group_param}" "${prefix_env}"
 chmod 2770 "${prefix_env}"
 
 find "${prefix_env}" -type d -exec chmod 2770 {} \;
 find "${prefix_env}" -type f -exec chmod ug+rw,o-rwx {} \;
 
-if [ "${SYSTEMD_ENABLE}" = "yes" ]
+
+
+# TODO: configure systemd for all users
+if [ "${run_service}" = "yes" ]
 then
-		systemd_enable "${systemd_user_dir}" "${systemd_filename}" "${httpd_bin}" "${listen_port}"
-else
- 		"${httpd_bin}" -d "${serverroot}" -DFOREGROUND \
-			-c"PidFile var/httpd.pid" \
-			-c"Listen 127.0.0.1:${listen_port}"
+	if [ "$(id -u -n)" != "${user_param}" ]
+	then
+		printf -- "[-] WARNING, --run only works for current user\n"
+		exit 1
+	fi
+
+	if [ "${SYSTEMD_ENABLE}" = "yes" ]
+	then
+			systemd_enable "${systemd_user_dir}" "${systemd_filename}" "${httpd_bin}" "${listen_port}"
+	else
+			"${httpd_bin}" -d "${serverroot}" -DFOREGROUND \
+				-c"PidFile var/httpd.pid" \
+				-c"Listen 127.0.0.1:${listen_port}"
+	fi
 fi
-
-
-
-
-
-
 
