@@ -353,6 +353,7 @@ enable-commit-graph=1
 enable-log-filecount=1
 enable-log-linecount=1
 logo=/cgit-css/cgit.png
+logo-link=/
 max-stats=year
 root-title=${user_param} git repos
 root-desc=Some sources
