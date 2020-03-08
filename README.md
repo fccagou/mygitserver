@@ -1,5 +1,16 @@
 ![Cagou git](doc/cagou-git.png)
 # mygitserver
+
+<!-- vim-markdown-toc GFM -->
+
+* [Description](#description)
+* [What's done](#whats-done)
+* [Warning](#warning)
+* [Selinux](#selinux)
+* [TODO](#todo)
+
+<!-- vim-markdown-toc -->
+
 ## Description
 
 Create a simply git server based on [cgit](https://git.zx2c4.com/cgit/about/)
