@@ -306,7 +306,6 @@ EOF_SYSTEMD
 	
 		systemctl --user daemon-reload
 		systemctl --user enable httpd
-		systemctl --user restart httpd
 }
 
 
@@ -607,8 +606,15 @@ find "${prefix_env}" -type d -exec chmod 2770 {} \;
 find "${prefix_env}" -type f -exec chmod ug+rw,o-rwx {} \;
 
 
-
 # TODO: configure systemd for all users
+if [ "${SYSTEMD_ENABLE}" = "yes" ]
+then
+	[ "$(id -u -n)" = "${user_param}" ]  \
+		&& systemd_enable "${systemd_user_dir}" "${systemd_filename}" "${httpd_bin}" "${listen_port}" \
+		|| printf -- "[-] WARNING, --systemd only works for current user\n"
+fi
+
+
 if [ "${run_service}" = "yes" ]
 then
 	if [ "$(id -u -n)" != "${user_param}" ]
@@ -616,10 +622,9 @@ then
 		printf -- "[-] WARNING, --run only works for current user\n"
 		exit 1
 	fi
-
 	if [ "${SYSTEMD_ENABLE}" = "yes" ]
 	then
-		systemd_enable "${systemd_user_dir}" "${systemd_filename}" "${httpd_bin}" "${listen_port}"
+		systemctl --user restart httpd
 	else
 		"${httpd_bin}" -d "${serverroot}" -DFOREGROUND \
 			-c"PidFile var/httpd.pid" \
