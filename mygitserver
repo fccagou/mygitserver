@@ -400,8 +400,8 @@ cgit_http_conf () {
 SetEnv CGIT_ROOT ${cgit_root}
 SetEnv CGIT_CONFIG ${cgit_rc}
 
-ScriptAlias /cgit "${cgit_script}"
 Alias /cgit-css "${cgit_data}"
+ScriptAlias /cgit "${cgit_script}"
 <Directory "${cgit_data}">
    AllowOverride None
    Options None
