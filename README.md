@@ -148,6 +148,7 @@ If the git dir is not a default httpd dir, update fcontext
 
 ## TODO
 * Allow user defined logo.
+* Add -v/--verbose parameter.
 * Add httpd server param to manage configuration (apache/nginx/ligthttp...)
 * Certainly many others good features.
 * Add scripts to manage git bare repos
@@ -156,7 +157,6 @@ If the git dir is not a default httpd dir, update fcontext
 * Install required distro packages
 * Put each feature in a separate script
 * Use getops. Not necessary yet.
-* Add --env-update or something like that.
 * Add current usercheck to use or not sudo.
 * Configure systemd for all users
 * make a [puppet/bolt](https://puppet.com/docs/bolt/latest/bolt.html) project.
