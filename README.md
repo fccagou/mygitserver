@@ -45,8 +45,9 @@ It's developed on [Arch](https://www.archlinux.org/) and tested on [CentOS
                   [--systemd-enable]
                   [--systemd-uninstall]
                   [--listen-port <port>]
-                  [--add-myself-as-git-sample]
-                  <prefix_env>
+                  [--system-cgit-script-dir]
+                  [--system-cgit-script-name]
+                  [--system-cgit-data-dir]
     
     	--help|-h                  : This help
     	--run                      : Run the server after creation.
@@ -63,8 +64,12 @@ It's developed on [Arch](https://www.archlinux.org/) and tested on [CentOS
     	--listen-port              : Define http listen port.
     	                             Must be greter then 1024.
     	                             Default is 8080.
+    	--system-cgit-script-dir   : Define cgit script dir
+    	--system-cgit-script-name  : Define cgit script name relative to script dir
+    	--system-cgit-data-dir     : Define cgit dir containing web matérial (css, png)
     	--add-myself-as-git-sample : Clone myself in repos.
     	prefix_env                 : dir where cgit and http data will be created
+
 
 Will create :
     
@@ -155,4 +160,5 @@ If the git dir is not a default httpd dir, update fcontext
 * Add current usercheck to use or not sudo.
 * Configure systemd for all users
 * make a [puppet/bolt](https://puppet.com/docs/bolt/latest/bolt.html) project.
+
 

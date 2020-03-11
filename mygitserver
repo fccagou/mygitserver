@@ -23,8 +23,9 @@ Usage: ${PRG} [--help|-h]
               [--systemd-enable]
               [--systemd-uninstall]
               [--listen-port <port>]
-              [--add-myself-as-git-sample]
-              <prefix_env>
+              [--system-cgit-script-dir]
+              [--system-cgit-script-name]
+              [--system-cgit-data-dir]
 
 	--help|-h                  : This help
 	--run                      : Run the server after creation.
@@ -41,6 +42,9 @@ Usage: ${PRG} [--help|-h]
 	--listen-port              : Define http listen port.
 	                             Must be greter then 1024.
 	                             Default is 8080.
+	--system-cgit-script-dir   : Define cgit system script dir
+	--system-cgit-script-name  : Define cgit system script name relative to script dir
+	--system-cgit-data-dir     : Define cgit system dir containing web matérial (css, png)
 	--add-myself-as-git-sample : Clone myself in repos.
 	prefix_env                 : dir where cgit and http data will be created
 
@@ -339,9 +343,14 @@ cgit_conf () {
 	cgit_root="${1}"
 	cgit_rc="${2}"
 	user_param="${3}"
+	system_cgit_data_dir="${4}"
+	cgit_data_dir="${5}"
 
 	[ ! -d "${cgit_root}" ] && mkdir -p "${cgit_root}"
 	[ ! -d "${cgit_root}"/repos ] && mkdir -p "${cgit_root}"/repos
+
+	[ ! -d "${cgit_data_dir}" ] &&  mkdir -p "${cgit_data_dir}"
+	/bin/cp -a "${system_cgit_data_dir}"/* "${cgit_data_dir}"
 
 	cat > "${cgit_rc}" <<EOF_CGITRC
 #
@@ -393,22 +402,22 @@ cgit_http_conf () {
 	http_conf_filename="${1}"
 	cgit_root="${2}"
 	cgit_rc="${3}"
-	cgit_home="${4}"
-	cgit_script="${5}"
-	cgit_data="${6}"
+	system_cgit_script_dir="${4}"
+	system_cgit_script_name="${5}"
+	cgit_data_dir="${6}"
 
 	cat > "${http_conf_filename}" <<EOF_CGIT
 SetEnv CGIT_ROOT ${cgit_root}
 SetEnv CGIT_CONFIG ${cgit_rc}
 
-Alias /cgit-css "${cgit_data}"
-ScriptAlias /cgit "${cgit_script}"
-<Directory "${cgit_data}">
+Alias /cgit-css "${cgit_data_dir}/"
+ScriptAlias /cgit "${system_cgit_script_dir}/${system_cgit_script_name}/"
+<Directory "${cgit_data_dir}/">
    AllowOverride None
    Options None
    Require all granted
 </Directory>
-<Directory "${cgit_home}">
+<Directory "${system_cgit_script_dir}/">
    AllowOverride None
    Options ExecCGI FollowSymlinks
    Require all granted
@@ -435,6 +444,9 @@ add_samples=""
 run_service="no"
 update_env="no"
 
+system_cgit_script_dir=""
+system_cgit_script_name=""
+system_cgit_data_dir=""
 
 while [ -n "${1}" ]
 do
@@ -469,6 +481,20 @@ do
 			;;
 		"--group")
 			group_param="${2}"
+			shift
+			;;
+
+		# CGIT congig
+		"--system-cgit-script-dir")
+			system_cgit_script_dir="${2}"
+			shift
+			;;
+		"--system-cgit-script-name")
+			system_cgit_script_name="${2}"
+			shift
+			;;
+		"--system-cgit-data-dir")
+			system_cgit_data_dir="${2}"
 			shift
 			;;
 		*)
@@ -553,7 +579,39 @@ conf_extra_dir="${conf_dir}"/extra
 modules_dir="${serverroot}"/modules
 
 cgit_root="${prefix_env}"/cgit
+cgit_data_dir="${cgit_root}"/data
 cgit_rc="${cgit_root}"/cgitrc
+
+# cgit conf
+# Do some expectation about wat I know.
+# Sometime it's more efficient than making
+# more configurable but complex things.
+
+if [ -d /usr/share/webapps/cgit ]
+then
+	# Arch
+	system_cgit_script_dir="/usr/lib/cgit"
+	system_cgit_script_name="cgit.cgi"
+	system_cgit_data_dir="/usr/share/webapps/cgit"
+elif [ -d /usr/share/cgit ]
+then
+	# centos/rhel
+	system_cgit_script_dir="/var/www/cgi-bin"
+	system_cgit_script_name="cgit"
+	system_cgit_data_dir="/usr/share/cgit"
+fi
+
+error="no"
+for f in "${system_cgit_script_dir}" "${system_cgit_script_dir}"/"${system_cgit_script_name}" "${system_cgit_data_dir}"
+do
+	if [ -z "${f}" ] || [ ! -e "${f}" ]
+	then
+		printf -- "[-] ERROR, cgit system file '%s' not found\n" "${f}"
+		error="yes"
+	fi
+done
+# Got somme errors, goodbye
+[ "${error}" = "yes" ] && exit 1
 
 
 
@@ -576,13 +634,14 @@ config_httpd "${conf_dir}" "${httpd_conf}" \
 make_index "${index_html}" "${user_param}"
 
 
-cgit_conf "${cgit_root}" "${cgit_rc}" "${user_param}"
+cgit_conf "${cgit_root}" "${cgit_rc}" "${user_param}" "${system_cgit_data_dir}" "${cgit_data_dir}"
 cgit_http_conf "${conf_extra_dir}"/httpd-cgit.conf \
     "${cgit_root}" \
 	"${cgit_rc}" \
-    "/usr/lib/cgit/" \
-	"/usr/lib/cgit/cgit.cgi/" \
-    "/usr/share/webapps/cgit/"
+	"${system_cgit_script_dir}" \
+	"${system_cgit_script_name}" \
+	"${cgit_data_dir}"
+
 
 grep -q -v "^Include ${conf_extra_dir}/httpd-cgit.conf" "${httpd_conf}" \
 	&& echo "Include ${conf_extra_dir}/httpd-cgit.conf" >> "${httpd_conf}"
