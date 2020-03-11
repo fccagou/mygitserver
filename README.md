@@ -39,6 +39,7 @@ It's developed on [Arch](https://www.archlinux.org/) and tested on [CentOS
 
     Usage: mygitserver [--help|-h]
                   [--run]
+                  [--update]
                   [--user <user>]
                   [--group <group>]
                   [--systemd-enable]
@@ -47,22 +48,23 @@ It's developed on [Arch](https://www.archlinux.org/) and tested on [CentOS
                   [--add-myself-as-git-sample]
                   <prefix_env>
     
-       --help|-h                  : This help
-       --run                      : Run the server after creation.
-                                    Only works for current user.
-       --user                     : Install service for his user.
-                                    Default is current user (fccagou)
-       --group                    : Install service for this group.
-                                    Default is current user group(fccagou).
-       --systemd-enable           : configure user systemd service and runs it.
-                                    Only works for current user.
-       --systemd-uninstall        : remove user systemd configuration
-                                    Only works for current user.
-       --listen-port              : Define http listen port.
-                                    Must be greter then 1024.
-                                    Default is 8080.
-       --add-myself-as-git-sample : Clone myself in repos.
-       prefix_env                 : dir where cgit and http data will be created
+    	--help|-h                  : This help
+    	--run                      : Run the server after creation.
+                                     Only works for current user.
+    	--update                   : Update config file in existing env.
+    	--user                     : Install service for his user.
+                                     Default is current user (fccagou)
+    	--group                    : Install service for this group.
+    	                             Default is current user group(fccagou).
+    	--systemd-enable           : configure user systemd service and runs it.
+                                     Only works for current user.
+    	--systemd-uninstall        : remove user systemd configuration
+                                     Only works for current user.
+    	--listen-port              : Define http listen port.
+    	                             Must be greter then 1024.
+    	                             Default is 8080.
+    	--add-myself-as-git-sample : Clone myself in repos.
+    	prefix_env                 : dir where cgit and http data will be created
 
 Will create :
     
@@ -153,3 +155,4 @@ If the git dir is not a default httpd dir, update fcontext
 * Add current usercheck to use or not sudo.
 * Configure systemd for all users
 * make a [puppet/bolt](https://puppet.com/docs/bolt/latest/bolt.html) project.
+

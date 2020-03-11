@@ -17,6 +17,7 @@ usage () {
 
 Usage: ${PRG} [--help|-h]
               [--run]
+              [--update]
               [--user <user>]
               [--group <group>]
               [--systemd-enable]
@@ -28,6 +29,7 @@ Usage: ${PRG} [--help|-h]
 	--help|-h                  : This help
 	--run                      : Run the server after creation.
                                  Only works for current user.
+	--update                   : Update config file in existing env.
 	--user                     : Install service for his user.
                                  Default is current user (${user_param})
 	--group                    : Install service for this group.
@@ -431,6 +433,7 @@ prefix_env=""
 listen_port="8080"
 add_samples=""
 run_service="no"
+update_env="no"
 
 
 while [ -n "${1}" ]
@@ -442,6 +445,9 @@ do
 			;;
 		"--run" )
 			run_service="yes"
+			;;
+		"--update" )
+			update_env="yes"
 			;;
 		"--systemd-enable" )
 			SYSTEMD_ENABLE="yes"
@@ -465,7 +471,6 @@ do
 			group_param="${2}"
 			shift
 			;;
-
 		*)
 			prefix_env="${1}"
 			;;
@@ -532,10 +537,9 @@ then
 fi
 
 # Hum, the directory exists, let the user remove it if necessary
-# TODO: add --env-update or something like that.
-if [ -d "${prefix_env}" ]
+if [ -d "${prefix_env}" ] && [ "${update_env}" != "yes" ]
 then
-	printf -- "[-] ERROR, prefix_env %s exists\n" "${prefix_env}"
+	printf -- "[-] ERROR, prefix_env %s exists\n\n    use --update to update env.\n\n" "${prefix_env}"
 	exit 2
 fi
 
